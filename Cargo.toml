@@ -1,0 +1,12 @@
+[package]
+name = "dk-search"
+version = "0.1.0"
+authors = ["Mark Abspoel <mail@markabspoel.nl>"]
+
+[dependencies]
+num = "0.2"
+num-bigint = "0.2"
+num-traits = "0.2"
+argparse = "0.2.2"
+primal = "0.2"
+time = "0.1"
