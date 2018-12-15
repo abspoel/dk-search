@@ -80,7 +80,7 @@ def main():
                 elif (f, k) != k_values or star_match != use_star:
                     raise ValueError("Line {} does not match k_values {} or use_star {} from before".format(line, k_values, use_star))
 
-                p, d0, d1 = int(match.group(1)), int(match.group(3)), int(match.group(4))
+                p, d0, d1 = int(match.group(1)), int(match.group(5)), int(match.group(8))
                 add_to_bests(bests, p, d0, d1)
 
     star = "*" if use_star else ""
