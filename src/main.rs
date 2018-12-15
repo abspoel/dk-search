@@ -1,37 +1,30 @@
-extern crate num;
 extern crate argparse;
-extern crate primal;
+extern crate num;
 extern crate num_bigint;
 extern crate num_traits;
+extern crate primal;
 extern crate time;
 
-use std::ops::ShrAssign;
-use std::fmt;
-use std::collections::{HashSet,HashMap};
-use argparse::{ArgumentParser, StoreTrue, StoreFalse, Store};
+use argparse::{ArgumentParser, Store, StoreFalse, StoreTrue};
 use num::Integer;
-use num_bigint::{BigInt,ToBigInt};
+use num_bigint::{BigInt, ToBigInt};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::ops::ShrAssign;
 use time::precise_time_s;
 
 #[derive(Clone)]
 struct Sieve {
     modulus: usize,
-    qr: Vec<u8>
+    qr: Vec<u8>,
 }
 
-trait NumAssignOps<Rhs = Self>
-    : num::traits::NumAssignOps<Rhs>
-    + ShrAssign<Rhs>
-{}
+trait NumAssignOps<Rhs = Self>: num::traits::NumAssignOps<Rhs> + ShrAssign<Rhs> {}
 
-impl<T, Rhs> NumAssignOps<Rhs> for T
-where T: num::traits::NumAssignOps<Rhs>
-    + ShrAssign<Rhs>
-{}
+impl<T, Rhs> NumAssignOps<Rhs> for T where T: num::traits::NumAssignOps<Rhs> + ShrAssign<Rhs> {}
 
-
-trait Num<Base=Self>
-    : num::traits::Num
+trait Num<Base = Self>:
+    num::traits::Num
     + NumAssignOps
     + From<u8>
     + Clone
@@ -39,25 +32,28 @@ trait Num<Base=Self>
     + PartialEq<Base>
     + PartialOrd<Base>
     + ToBigInt
-{}
+{
+}
 
-impl<T, Base> Num<Base> for T
-where T: num::traits::Num
-    + NumAssignOps
-    + From<u8>
-    + Clone
-    + Copy
-    + PartialEq<Base>
-    + PartialOrd<Base>
-    + ToBigInt
-{}
-
+impl<T, Base> Num<Base> for T where
+    T: num::traits::Num
+        + NumAssignOps
+        + From<u8>
+        + Clone
+        + Copy
+        + PartialEq<Base>
+        + PartialOrd<Base>
+        + ToBigInt
+{
+}
 
 /// Calculate the Legendre symbol (a/p), which is returned as an element
 /// in {0,1} = F_2. It is 0 iff `a` is a quadratic residue modulo `p`.
 fn legendre<T>(a: T, p: T) -> u8
-    where T: Num {
-    let e = ((p-T::from(1))/T::from(2)).to_bigint().unwrap();
+where
+    T: Num,
+{
+    let e = ((p - T::from(1)) / T::from(2)).to_bigint().unwrap();
     (a.to_bigint().unwrap().modpow(&e, &(p.to_bigint().unwrap())) == BigInt::from(1u8)) as u8
 }
 
@@ -65,12 +61,16 @@ fn legendre<T>(a: T, p: T) -> u8
 struct Primes {
     cur: usize,
     bound: usize,
-    sieve: Vec<u8>
+    sieve: Vec<u8>,
 }
 
 impl Primes {
     fn new(bound: usize) -> Self {
-        Primes { cur: 1, bound: bound, sieve: vec![0; bound] }
+        Primes {
+            cur: 1,
+            bound: bound,
+            sieve: vec![0; bound],
+        }
     }
 
     fn next_prime(&mut self, after: usize) -> Option<usize> {
@@ -78,14 +78,14 @@ impl Primes {
         while search < self.cur {
             search += 1;
             if self.sieve[search] == 0 {
-                return Some(search)
+                return Some(search);
             }
         }
 
         while self.cur < self.bound - 1 {
             self.cur += 1;
             if self.sieve[self.cur] == 0 {
-                let mut k = 2*self.cur;
+                let mut k = 2 * self.cur;
                 while k < self.bound {
                     self.sieve[k] = 1;
                     k += self.cur;
@@ -110,7 +110,10 @@ impl<'a> IntoIterator for &'a mut Primes {
     type IntoIter = PrimesIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        PrimesIterator { cur: 1, primes: self }
+        PrimesIterator {
+            cur: 1,
+            primes: self,
+        }
     }
 }
 
@@ -127,7 +130,9 @@ impl<'a> Iterator for PrimesIterator<'a> {
 }
 
 fn lcm<T>(a: T, b: T) -> Result<T, ()>
-    where T: num::CheckedMul + num::Integer {
+where
+    T: num::CheckedMul + num::Integer,
+{
     match a.checked_mul(&b) {
         Some(x) => Ok(x / a.gcd(&b)),
         None => Err(()),
@@ -137,7 +142,7 @@ fn lcm<T>(a: T, b: T) -> Result<T, ()>
 impl Sieve {
     fn new(modulus: usize) -> Sieve {
         let mut qr: Vec<u8> = Vec::with_capacity(modulus);
-        let minus_one = legendre(modulus-1, modulus);
+        let minus_one = legendre(modulus - 1, modulus);
 
         qr.push(0);
 
@@ -145,21 +150,32 @@ impl Sieve {
             qr.push((1 + minus_one + legendre(a, modulus)) % 2);
         }
 
-        Sieve{qr: qr, modulus: modulus}
+        Sieve {
+            qr: qr,
+            modulus: modulus,
+        }
     }
 
     fn combine(sieves: &[Sieve]) -> Result<Sieve, ()> {
-        let modulus = try!(sieves.iter()
-                                 .map(|s| s.modulus)
-                                 .fold(Ok(1), |res, x| res.and_then(|acc| lcm(acc, x))));
+        let modulus = try!(sieves
+            .iter()
+            .map(|s| s.modulus)
+            .fold(Ok(1), |res, x| res.and_then(|acc| lcm(acc, x))));
         let mut qr: Vec<u8> = Vec::with_capacity(modulus);
         for a in 0..modulus {
             qr.push(sieves.iter().map(|s| s.qr[a % s.modulus]).all(|x| x == 1) as u8);
         }
-        Ok(Sieve{modulus: modulus, qr: qr})
+        Ok(Sieve {
+            modulus: modulus,
+            qr: qr,
+        })
     }
 
-    fn take_first(sorted: &mut Vec<Sieve>, group: &mut Vec<Sieve>, max_size: &mut i64) -> Result<(),()> {
+    fn take_first(
+        sorted: &mut Vec<Sieve>,
+        group: &mut Vec<Sieve>,
+        max_size: &mut i64,
+    ) -> Result<(), ()> {
         if sorted.is_empty() {
             Err(())
         } else {
@@ -206,7 +222,7 @@ impl Sieve {
 
     fn from_pair(pair: RelatedPair) -> Self {
         let (p, q) = pair;
-        let modulus = p*q;
+        let modulus = p * q;
         let s_p = Sieve::new(p);
         let s_q = Sieve::new(q);
         let mut qr = Vec::with_capacity(modulus);
@@ -215,17 +231,24 @@ impl Sieve {
         for _ in 0..modulus {
             qr.push(s_p[a_p] | s_q[a_q]);
             a_p += 1;
-            if (a_p) >= p { a_p -= p; }
+            if (a_p) >= p {
+                a_p -= p;
+            }
             a_q += 1;
-            if (a_q) >= q { a_q -= q; }
+            if (a_q) >= q {
+                a_q -= q;
+            }
         }
-        Sieve { qr: qr, modulus: modulus } 
+        Sieve {
+            qr: qr,
+            modulus: modulus,
+        }
     }
 
     #[allow(dead_code)]
     fn from_triple(triple: RelatedTriple) -> Self {
         let (p, q, r) = triple;
-        let modulus = p*q*r;
+        let modulus = p * q * r;
         let s_p = Sieve::new(p);
         let s_q = Sieve::new(q);
         let s_r = Sieve::new(r);
@@ -236,18 +259,29 @@ impl Sieve {
         for _ in 0..modulus {
             qr.push(s_p[a_p] | s_q[a_q] | s_r[a_r]);
             a_p += 1;
-            if (a_p) >= p { a_p -= p; }
+            if (a_p) >= p {
+                a_p -= p;
+            }
             a_q += 1;
-            if (a_q) >= q { a_q -= q; }
+            if (a_q) >= q {
+                a_q -= q;
+            }
             a_r += 1;
-            if (a_r) >= r { a_r -= r; }
-
+            if (a_r) >= r {
+                a_r -= r;
+            }
         }
-        Sieve { qr: qr, modulus: modulus } 
+        Sieve {
+            qr: qr,
+            modulus: modulus,
+        }
     }
 
     fn from_pairs(pairs: Vec<RelatedPair>) -> Result<Self, ()> {
-        let sieves = pairs.iter().map(|pair| Sieve::from_pair(*pair)).collect::<Vec<_>>();
+        let sieves = pairs
+            .iter()
+            .map(|pair| Sieve::from_pair(*pair))
+            .collect::<Vec<_>>();
         Sieve::combine(&sieves)
     }
 }
@@ -256,7 +290,10 @@ impl Sieve {
 type RelatedPair = (usize, usize);
 
 fn get_related_pairs(d0: usize, d1: usize, dk_star: bool) -> HashSet<RelatedPair> {
-    assert!(d0*d0 >= d1, "For this function to work, d0^2 should be greater than d1");
+    assert!(
+        d0 * d0 >= d1,
+        "For this function to work, d0^2 should be greater than d1"
+    );
     assert!(d0 >= 4, "d0 should be greater than max(difference)");
 
     let mut primes = Primes::new(d1);
@@ -264,10 +301,14 @@ fn get_related_pairs(d0: usize, d1: usize, dk_star: bool) -> HashSet<RelatedPair
 
     let mut p = d0;
 
-    let differences = if dk_star { [-2i64, 2, -4, 4] } else { [-1i64, 1, -2, 2] };
+    let differences = if dk_star {
+        [-2i64, 2, -4, 4]
+    } else {
+        [-1i64, 1, -2, 2]
+    };
 
     loop {
-        let mut marked = vec![0u8; d1+5]; // d1+1 + max(difference)
+        let mut marked = vec![0u8; d1 + 5]; // d1+1 + max(difference)
         if let Some(prime) = primes.next_prime(p) {
             p = prime;
         } else {
@@ -277,24 +318,28 @@ fn get_related_pairs(d0: usize, d1: usize, dk_star: bool) -> HashSet<RelatedPair
         // Mark multiples of p : d0 < p <= d1
         {
             let mut k = 1;
-            while k*p <= d1 {
-                marked[k*p] = 1;
+            while k * p <= d1 {
+                marked[k * p] = 1;
                 k += if dk_star { 2 } else { 1 };
             }
         }
-        
+
         // Test whether we have k*q+s is marked, for d0 < q < p < d1
         let mut q = d0;
         loop {
             if let Some(prime) = primes.next_prime(q) {
                 q = prime;
-            } else { break; }
-            if q >= p { break; }
+            } else {
+                break;
+            }
+            if q >= p {
+                break;
+            }
 
             let mut k = 1;
-            while k*q <= d1 {
+            while k * q <= d1 {
                 for s in &differences {
-                    if marked[((k*q) as i64+s) as usize] != 0 {
+                    if marked[((k * q) as i64 + s) as usize] != 0 {
                         // println!("Add edge: ({}, {}) since ?*{} == {}*{}+{}", q, p, p, k, q, s);
                         pairs.insert((q, p));
                     }
@@ -311,7 +356,10 @@ type RelatedTriple = (usize, usize, usize);
 
 #[allow(dead_code)]
 fn get_related_triples(d0: usize, d2: usize, dk_star: bool) -> HashSet<RelatedTriple> {
-    assert!(d0*d0 >= d2, "For this function to work, d0^2 should be greater than d2");
+    assert!(
+        d0 * d0 >= d2,
+        "For this function to work, d0^2 should be greater than d2"
+    );
     assert!(d0 >= 6, "d0 should be greater than max(difference)");
 
     let mut primes = Primes::new(d2);
@@ -319,12 +367,16 @@ fn get_related_triples(d0: usize, d2: usize, dk_star: bool) -> HashSet<RelatedTr
 
     let mut p = d0;
 
-    let differences = if dk_star { [-2i64, 2, -4, 4, -6, 6, -8, 8] } else { [-1i64, 1, -2, 2, -3, 3, -4, 4] };
+    let differences = if dk_star {
+        [-2i64, 2, -4, 4, -6, 6, -8, 8]
+    } else {
+        [-1i64, 1, -2, 2, -3, 3, -4, 4]
+    };
 
     let star_factor = if dk_star { 2 } else { 1 };
 
     loop {
-        let mut marked = vec![0u8; d2+9]; // d2+1 + max(s)
+        let mut marked = vec![0u8; d2 + 9]; // d2+1 + max(s)
         if let Some(prime) = primes.next_prime(p) {
             p = prime;
         } else {
@@ -334,33 +386,43 @@ fn get_related_triples(d0: usize, d2: usize, dk_star: bool) -> HashSet<RelatedTr
         // Mark multiples of p : d0 < p <= d2
         {
             let mut k = 1;
-            while k*p <= d2 {
-                marked[k*p] = 1;
+            while k * p <= d2 {
+                marked[k * p] = 1;
                 k += if dk_star { 2 } else { 1 };
             }
         }
-        
+
         // Test whether we have k*q+s is marked, for d0 < r < q < p < d1
         let mut q = d0;
         loop {
             if let Some(prime) = primes.next_prime(q) {
                 q = prime;
-            } else { break; }
-            if q >= p { break; }
+            } else {
+                break;
+            }
+            if q >= p {
+                break;
+            }
 
             let mut r = d0;
             loop {
                 if let Some(prime) = primes.next_prime(r) {
                     r = prime;
-                } else { break; }
-                if r >= q { break; }
+                } else {
+                    break;
+                }
+                if r >= q {
+                    break;
+                }
 
                 let mut k = 1;
-                while k*r <= d2 {
+                while k * r <= d2 {
                     for s1 in &differences {
-                        if marked[((k*r) as i64+s1) as usize] != 0 {
+                        if marked[((k * r) as i64 + s1) as usize] != 0 {
                             for s2 in &differences {
-                                if (s2 - s1).abs() <= star_factor*4 && marked[((k*r) as i64+s2) as usize] != 0 {
+                                if (s2 - s1).abs() <= star_factor * 4
+                                    && marked[((k * r) as i64 + s2) as usize] != 0
+                                {
                                     triples.insert((r, q, p));
                                 }
                             }
@@ -384,7 +446,7 @@ fn related_pair_sieves(pairs: HashSet<RelatedPair>, sieve_bound: usize) -> Vec<S
     let mut combined: Vec<Sieve> = Vec::new();
     let mut edges = pairs;
 
-    let mut degree: HashMap<usize,usize> = HashMap::new();
+    let mut degree: HashMap<usize, usize> = HashMap::new();
 
     for edge in &edges {
         for vertex in &[edge.0, edge.1] {
@@ -397,9 +459,16 @@ fn related_pair_sieves(pairs: HashSet<RelatedPair>, sieve_bound: usize) -> Vec<S
         let mut group_vertices: HashSet<usize> = HashSet::new();
         while !edges.is_empty() {
             let group_size;
-            match group_vertices.iter().fold(Ok(1usize), |res, x| res.and_then(|acc| lcm(acc, *x))) {
-                Ok(x) => { group_size = x; },
-                Err(_) => { break; }
+            match group_vertices
+                .iter()
+                .fold(Ok(1usize), |res, x| res.and_then(|acc| lcm(acc, *x)))
+            {
+                Ok(x) => {
+                    group_size = x;
+                }
+                Err(_) => {
+                    break;
+                }
             }
 
             let max_size = sieve_bound / group_size;
@@ -408,13 +477,19 @@ fn related_pair_sieves(pairs: HashSet<RelatedPair>, sieve_bound: usize) -> Vec<S
             // 2. we prioritize edges that have incident vertices already in our group
             // 3. there are edges remaining that have common vertices incident to the chosen edge
             // 4. the growth of group_size is small
-            let edge = edges.iter().max_by_key(|&&edge| {
+            let edge = edges
+                .iter()
+                .max_by_key(|&&edge| {
                     let (v1, v2) = edge;
                     let has_v1 = group_vertices.contains(&v1) as usize;
                     let has_v2 = group_vertices.contains(&v2) as usize;
                     let mut size = 1;
-                    if has_v1 == 0 { size *= v1; }
-                    if has_v2 == 0 { size *= v2; }
+                    if has_v1 == 0 {
+                        size *= v1;
+                    }
+                    if has_v2 == 0 {
+                        size *= v2;
+                    }
                     let size_score = if size > max_size { 0 } else { -(size as i64) };
                     let eligible = 1 - ((size > max_size) as i8);
                     let vertex_score = (has_v1 + has_v2) as i64;
@@ -422,13 +497,25 @@ fn related_pair_sieves(pairs: HashSet<RelatedPair>, sieve_bound: usize) -> Vec<S
                     let v2_degree = degree.get(&v2).unwrap();
                     let max_degree = v1_degree.max(v2_degree);
                     let min_degree = v1_degree.min(v2_degree);
-                    let score = (eligible as i8, vertex_score, *max_degree, *min_degree, size_score);
+                    let score = (
+                        eligible as i8,
+                        vertex_score,
+                        *max_degree,
+                        *min_degree,
+                        size_score,
+                    );
                     score
-                }).unwrap().clone();
+                })
+                .unwrap()
+                .clone();
             let (v1, v2) = edge;
             let mut size = 1;
-            if !group_vertices.contains(&v1) { size *= v1; }
-            if !group_vertices.contains(&v2) { size *= v2; }
+            if !group_vertices.contains(&v1) {
+                size *= v1;
+            }
+            if !group_vertices.contains(&v2) {
+                size *= v2;
+            }
             if size > max_size {
                 break;
             }
@@ -457,7 +544,12 @@ fn related_triple_sieves(triples: HashSet<RelatedTriple>, sieve_bound: usize) ->
 
     for triple in &triples {
         let modulus = triple.0 * triple.1 * triple.2;
-        assert!(modulus <= sieve_bound, "Modulus {} is greater than sieve_bound {}", modulus, sieve_bound);
+        assert!(
+            modulus <= sieve_bound,
+            "Modulus {} is greater than sieve_bound {}",
+            modulus,
+            sieve_bound
+        );
         let sieve = Sieve::from_triple(*triple);
         combined.push(sieve);
     }
@@ -468,12 +560,10 @@ fn related_triple_sieves(triples: HashSet<RelatedTriple>, sieve_bound: usize) ->
 impl std::ops::Index<usize> for Sieve {
     type Output = u8;
 
-
     fn index(&self, index: usize) -> &u8 {
         &self.qr[index]
     }
 }
-        
 
 impl fmt::Display for Sieve {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -514,13 +604,21 @@ impl From<Sieve> for JumpList {
         }
 
         jl.push(first + modulus - prev);
-        JumpList{modulus: modulus, first: first, jl: jl}
+        JumpList {
+            modulus: modulus,
+            first: first,
+            jl: jl,
+        }
     }
 }
 
 impl fmt::Display for JumpList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "Sieve(modulus={}, first={}, [", self.modulus, self.first));
+        try!(write!(
+            f,
+            "Sieve(modulus={}, first={}, [",
+            self.modulus, self.first
+        ));
         for a in &self.jl {
             try!(write!(f, "{}, ", a));
         }
@@ -596,7 +694,10 @@ fn to_wheel(modulus: usize, qr: &Vec<u8>, step: u64) -> Result<Wheel, ()> {
             cs_map[index] = consecutive.len() - 1;
         }
     }
-    assert_eq!(consecutive.len(), qr.iter().fold(0usize, |sum, val| sum + (*val as usize)));
+    assert_eq!(
+        consecutive.len(),
+        qr.iter().fold(0usize, |sum, val| sum + (*val as usize))
+    );
 
     for i in 0..(modulus as u64) {
         let mut jump = step;
@@ -625,7 +726,11 @@ fn to_wheel(modulus: usize, qr: &Vec<u8>, step: u64) -> Result<Wheel, ()> {
 }
 
 /// Convert sieves into a list of wheels, and possibly remaining sieves.
-fn to_wheels(mut sieves: Vec<Sieve>, zeroth_step: u64, step_bound: u64) -> (Vec<Wheel>, Vec<Sieve>) {
+fn to_wheels(
+    mut sieves: Vec<Sieve>,
+    zeroth_step: u64,
+    step_bound: u64,
+) -> (Vec<Wheel>, Vec<Sieve>) {
     let mut step = zeroth_step;
     let mut wheels: Vec<Wheel> = Vec::with_capacity(sieves.len());
 
@@ -637,8 +742,14 @@ fn to_wheels(mut sieves: Vec<Sieve>, zeroth_step: u64, step_bound: u64) -> (Vec<
             sieves.remove(ix);
 
             match step.checked_mul(modulus as u64) {
-                Some(x) => if x < step_bound { step = x } else { break },
-                None => { break }
+                Some(x) => {
+                    if x < step_bound {
+                        step = x
+                    } else {
+                        break;
+                    }
+                }
+                None => break,
             }
         } else {
             ix += 1;
@@ -649,11 +760,19 @@ fn to_wheels(mut sieves: Vec<Sieve>, zeroth_step: u64, step_bound: u64) -> (Vec<
 
 fn get_dk(p: u64, k: usize, lower_bound: usize, dk_star: bool) -> u64 {
     let mut window: Vec<i32> = Vec::new();
-    for i in ((lower_bound as i64)+1)-(k as i64)..((lower_bound as i64) + 2)+(k as i64) {
+    for i in ((lower_bound as i64) + 1) - (k as i64)..((lower_bound as i64) + 2) + (k as i64) {
         if dk_star {
-            window.push(if legendre(2*(i as i128)+1, p as i128) == 1 { 1 } else { -1 });
+            window.push(if legendre(2 * (i as i128) + 1, p as i128) == 1 {
+                1
+            } else {
+                -1
+            });
         } else {
-            window.push(if legendre(i as i128, p as i128) == 1 { 1 } else { -1 });
+            window.push(if legendre(i as i128, p as i128) == 1 {
+                1
+            } else {
+                -1
+            });
         }
     }
     let mut d = (lower_bound as u64) + 1;
@@ -661,27 +780,44 @@ fn get_dk(p: u64, k: usize, lower_bound: usize, dk_star: bool) -> u64 {
         d += 1;
         window.remove(0);
         if dk_star {
-            let pushval = if legendre(2*(d+(k as u64))+1, p) == 1 { 1 } else { -1 };
+            let pushval = if legendre(2 * (d + (k as u64)) + 1, p) == 1 {
+                1
+            } else {
+                -1
+            };
             window.push(pushval);
         } else {
-            window.push(if legendre(d+(k as u64), p) == 1 { 1 } else { -1 });
+            window.push(if legendre(d + (k as u64), p) == 1 {
+                1
+            } else {
+                -1
+            });
         }
     }
-    d-1
+    d - 1
 }
 
 struct HighDkPrime {
     p: u64,
     df: u64,
-    dk: u64
+    dk: u64,
 }
 
-fn output_num(x: u64, start_time: f64, dk_star: bool, bests: &mut Vec<HighDkPrime>, progress: f64, k: usize, df_min: usize, dk_min: usize) {
+fn output_num(
+    x: u64,
+    start_time: f64,
+    dk_star: bool,
+    bests: &mut Vec<HighDkPrime>,
+    progress: f64,
+    k: usize,
+    df_min: usize,
+    dk_min: usize,
+) {
     if primal::is_prime(x) {
         let elapsed = precise_time_s() - start_time;
         let star = if dk_star { "*" } else { "" };
         let bits = (x as f64).log2().ceil();
-        let f = k-1;
+        let f = k - 1;
         let df = get_dk(x, f, df_min, dk_star);
         let dk = get_dk(x, k, dk_min, dk_star);
         let mut insert;
@@ -707,17 +843,45 @@ fn output_num(x: u64, start_time: f64, dk_star: bool, bests: &mut Vec<HighDkPrim
 
         if insert {
             bests.retain(|hdp| hdp.p < x || hdp.df > df || hdp.dk > dk);
-            bests.insert(ix, HighDkPrime{p: x, df: df, dk: dk});
-            println!("[{:.3} s elapsed, {:.3}%] {} ({:.0} bits), d{}{}={}, d{}{}={}", elapsed, progress*100.0, x, bits, f, star, df, k, star, dk);
+            bests.insert(
+                ix,
+                HighDkPrime {
+                    p: x,
+                    df: df,
+                    dk: dk,
+                },
+            );
+            println!(
+                "[{:.3} s elapsed, {:.3}%] {} ({:.0} bits), d{}{}={}, d{}{}={}",
+                elapsed,
+                progress * 100.0,
+                x,
+                bits,
+                f,
+                star,
+                df,
+                k,
+                star,
+                dk
+            );
         }
     }
 }
 
-fn search(jumplist: &JumpList, sieves: &[Sieve], start: u64, stop: u64, dk_star: bool, k: usize, df_min: usize, dk_min: usize) -> Vec<HighDkPrime> {
+fn search(
+    jumplist: &JumpList,
+    sieves: &[Sieve],
+    start: u64,
+    stop: u64,
+    dk_star: bool,
+    k: usize,
+    df_min: usize,
+    dk_min: usize,
+) -> Vec<HighDkPrime> {
     let (mut p, mut i) = jumplist.first_after(start);
     let len = jumplist.jl.len();
     let start_time = precise_time_s();
-    let mut bests: Vec<HighDkPrime> = Vec::new(); 
+    let mut bests: Vec<HighDkPrime> = Vec::new();
     while p < stop {
         let mut b = 1;
         for sieve in sieves {
@@ -729,7 +893,9 @@ fn search(jumplist: &JumpList, sieves: &[Sieve], start: u64, stop: u64, dk_star:
 
         if b == 1 {
             let progress = (p - start) as f64 / (stop - start) as f64;
-            output_num(p, start_time, dk_star, &mut bests, progress, k, df_min, dk_min);
+            output_num(
+                p, start_time, dk_star, &mut bests, progress, k, df_min, dk_min,
+            );
         }
 
         p += jumplist.jl[i] as u64;
@@ -743,10 +909,19 @@ fn search(jumplist: &JumpList, sieves: &[Sieve], start: u64, stop: u64, dk_star:
     bests
 }
 
-fn search_with_wheels(wheels: &[Wheel], sieves: &[Sieve], start: u64, stop: u64, dk_star: bool, k: usize, df_min: usize, dk_min: usize) -> Vec<HighDkPrime> {
+fn search_with_wheels(
+    wheels: &[Wheel],
+    sieves: &[Sieve],
+    start: u64,
+    stop: u64,
+    dk_star: bool,
+    k: usize,
+    df_min: usize,
+    dk_min: usize,
+) -> Vec<HighDkPrime> {
     let len = wheels.len();
     let mut x = vec![0u64; len];
-    let mut bests: Vec<HighDkPrime> = Vec::new(); 
+    let mut bests: Vec<HighDkPrime> = Vec::new();
 
     // This is the number of times a jump has occurred in the i-th wheel. We start counting at 1:
     // the zeroth jump is the initial one (which is skipped if qr[index] == 1). We terminate and
@@ -773,7 +948,8 @@ fn search_with_wheels(wheels: &[Wheel], sieves: &[Sieve], start: u64, stop: u64,
 
                 // Rust should fix tuple assignment
                 let (xi, of) = x[i].overflowing_add(wheels[i].jump[index]);
-                x[i] = xi; overflow = of;
+                x[i] = xi;
+                overflow = of;
 
                 cs_index[i] = wheels[i].jump_to_ix[index];
                 is_indexed[i] = true;
@@ -782,16 +958,20 @@ fn search_with_wheels(wheels: &[Wheel], sieves: &[Sieve], start: u64, stop: u64,
                 if cs_index[i] >= wheels[i].consecutive.len() {
                     cs_index[i] -= wheels[i].consecutive.len();
                 }
-                
+
                 // Rust should fix tuple assignment
-                let (xi, of) =  x[i].overflowing_add(wheels[i].consecutive[cs_index[i]]);
-                x[i] = xi; overflow = of;
+                let (xi, of) = x[i].overflowing_add(wheels[i].consecutive[cs_index[i]]);
+                x[i] = xi;
+                overflow = of;
             }
 
             cnt[i] += 1;
         }
 
-        if do_jump && (((x[i] >= stop) || (i < len-1 && cnt[i] > wheels[i].consecutive.len())) || overflow) {
+        if do_jump
+            && (((x[i] >= stop) || (i < len - 1 && cnt[i] > wheels[i].consecutive.len()))
+                || overflow)
+        {
             overflow = false;
             if i > 0 {
                 i -= 1;
@@ -802,7 +982,7 @@ fn search_with_wheels(wheels: &[Wheel], sieves: &[Sieve], start: u64, stop: u64,
         } else {
             if i < len - 1 {
                 i += 1;
-                x[i] = x[i-1];
+                x[i] = x[i - 1];
 
                 index = (x[i] % (wheels[i].modulus as u64)) as usize;
                 cnt[i] = wheels[i].qr[index] as usize;
@@ -821,11 +1001,14 @@ fn search_with_wheels(wheels: &[Wheel], sieves: &[Sieve], start: u64, stop: u64,
                 if b == 1 {
                     let mut progress = 0.0;
                     let mut fraction = 1.0;
-                    for j in 0..len-1 {
-                        progress += fraction*((cnt[j]-1) as f64 / wheels[j].consecutive.len() as f64);
+                    for j in 0..len - 1 {
+                        progress +=
+                            fraction * ((cnt[j] - 1) as f64 / wheels[j].consecutive.len() as f64);
                         fraction /= wheels[j].consecutive.len() as f64;
                     }
-                    output_num(x[i], start_time, dk_star, &mut bests, progress, k, df_min, dk_min);
+                    output_num(
+                        x[i], start_time, dk_star, &mut bests, progress, k, df_min, dk_min,
+                    );
                 }
                 do_jump = true;
             }
@@ -837,30 +1020,43 @@ fn search_with_wheels(wheels: &[Wheel], sieves: &[Sieve], start: u64, stop: u64,
 }
 
 /// Set jumplist_bound to 0 to disable JumpList
-fn preprocess(d0: usize, d1: usize, jumplist_bound: usize, sieve_bound: usize, dk_star: bool) -> (Option<JumpList>, Vec<Sieve>) {
-    let primes_bound = if dk_star { 2*d0+1 } else { d0 };
-    let fixed_sieve = 
-        if dk_star {
-            Sieve { modulus: 4, qr: vec![0, 0, 0, 1] }
-        } else {
-            Sieve { modulus: 8, qr: vec![0, 0, 0, 0, 0, 0, 0, 1] }
-        };
+fn preprocess(
+    d0: usize,
+    d1: usize,
+    jumplist_bound: usize,
+    sieve_bound: usize,
+    dk_star: bool,
+) -> (Option<JumpList>, Vec<Sieve>) {
+    let primes_bound = if dk_star { 2 * d0 + 1 } else { d0 };
+    let fixed_sieve = if dk_star {
+        Sieve {
+            modulus: 4,
+            qr: vec![0, 0, 0, 1],
+        }
+    } else {
+        Sieve {
+            modulus: 8,
+            qr: vec![0, 0, 0, 0, 0, 0, 0, 1],
+        }
+    };
     // println!("Fixed sieve={}", fixed_sieve);
 
     let mut primes = Primes::new(primes_bound);
-    let iter = PrimesIterator { cur: 2, primes: &mut primes };
+    let iter = PrimesIterator {
+        cur: 2,
+        primes: &mut primes,
+    };
     let prime_sieves: Vec<Sieve> = iter.map(|p| Sieve::new(p)).collect();
 
     let mut sorted = prime_sieves;
     // This should already be sorted by ascending modulus. We want the sparsest sieves first,
     // since then each jump (what we do most) is as far as possible.
-    
-    let mut max_size = 
-        if jumplist_bound > 0 {
-            (jumplist_bound / fixed_sieve.modulus) as i64
-        } else {
-            (sieve_bound / fixed_sieve.modulus) as i64
-        };
+
+    let mut max_size = if jumplist_bound > 0 {
+        (jumplist_bound / fixed_sieve.modulus) as i64
+    } else {
+        (sieve_bound / fixed_sieve.modulus) as i64
+    };
 
     let mut group = vec![fixed_sieve];
     loop {
@@ -870,7 +1066,7 @@ fn preprocess(d0: usize, d1: usize, jumplist_bound: usize, sieve_bound: usize, d
     }
 
     let first_sieve = Sieve::combine(&group).unwrap();
-    let mut combined: Vec<Sieve> = vec!();
+    let mut combined: Vec<Sieve> = vec![];
     let jumplist;
     if jumplist_bound > 0 {
         jumplist = Some(JumpList::from(first_sieve));
@@ -881,7 +1077,7 @@ fn preprocess(d0: usize, d1: usize, jumplist_bound: usize, sieve_bound: usize, d
 
     combined.append(&mut Sieve::combine_all(sorted, sieve_bound));
 
-    let d1_bound = if dk_star { 2*d1 + 1 } else { d1 };
+    let d1_bound = if dk_star { 2 * d1 + 1 } else { d1 };
     let pairs = get_related_pairs(primes_bound, d1_bound, dk_star);
     let mut pair_sieves = related_pair_sieves(pairs, sieve_bound);
     combined.append(&mut pair_sieves);
@@ -901,15 +1097,51 @@ fn main() {
     let mut dk_star = false;
     {
         let mut parser = ArgumentParser::new();
-        parser.refer(&mut d0).required().add_argument("d0", Store, "Minimum value of d_0 to sieve for");
-        parser.refer(&mut d1).required().add_argument("d1", Store, "Minimum value of d_1 to sieve for");
-        parser.refer(&mut stop).required().add_argument("stop", Store, "Maximum value of p to search for");
-        parser.refer(&mut k).add_option(&["-k"], Store, "The parameter k, either 1 or 2 (default: k=1)");
-        parser.refer(&mut jumplist_bound).add_option(&["--jumplist-bound"], Store, "Maximum size (modulus) of the jumplist. Set to 0 to disable.");
-        parser.refer(&mut sieve_bound).add_option(&["--sieve-bound"], Store, "Maximum size (modulus) of each sieve");
-        parser.refer(&mut with_wheel).add_option(&["--no-wheel"], StoreFalse, "Use traditional sieves and a jumplist instead of wheels");
-        parser.refer(&mut start).add_option(&["--start"], Store, "Value of p to start searching at");
-        parser.refer(&mut dk_star).add_option(&["-s", "--dk-star"], StoreTrue, "Find d_k^* instead of d_k, i.e. only look at odd indices for the Legendre symbol");
+        parser.refer(&mut d0).required().add_argument(
+            "d0",
+            Store,
+            "Minimum value of d_0 to sieve for",
+        );
+        parser.refer(&mut d1).required().add_argument(
+            "d1",
+            Store,
+            "Minimum value of d_1 to sieve for",
+        );
+        parser.refer(&mut stop).required().add_argument(
+            "stop",
+            Store,
+            "Maximum value of p to search for",
+        );
+        parser.refer(&mut k).add_option(
+            &["-k"],
+            Store,
+            "The parameter k, either 1 or 2 (default: k=1)",
+        );
+        parser.refer(&mut jumplist_bound).add_option(
+            &["--jumplist-bound"],
+            Store,
+            "Maximum size (modulus) of the jumplist. Set to 0 to disable.",
+        );
+        parser.refer(&mut sieve_bound).add_option(
+            &["--sieve-bound"],
+            Store,
+            "Maximum size (modulus) of each sieve",
+        );
+        parser.refer(&mut with_wheel).add_option(
+            &["--no-wheel"],
+            StoreFalse,
+            "Use traditional sieves and a jumplist instead of wheels",
+        );
+        parser.refer(&mut start).add_option(
+            &["--start"],
+            Store,
+            "Value of p to start searching at",
+        );
+        parser.refer(&mut dk_star).add_option(
+            &["-s", "--dk-star"],
+            StoreTrue,
+            "Find d_k^* instead of d_k, i.e. only look at odd indices for the Legendre symbol",
+        );
         parser.parse_args_or_exit();
     }
 
@@ -918,9 +1150,12 @@ fn main() {
         std::process::exit(1);
     }
 
-    if with_wheel { jumplist_bound = 0; };
+    if with_wheel {
+        jumplist_bound = 0;
+    };
     println!("Preprocessing...");
-    let (jumplist, sieves): (Option<JumpList>, Vec<Sieve>) = preprocess(d0, d1, jumplist_bound, sieve_bound, dk_star);
+    let (jumplist, sieves): (Option<JumpList>, Vec<Sieve>) =
+        preprocess(d0, d1, jumplist_bound, sieve_bound, dk_star);
 
     for sieve in &sieves {
         println!("Sieve has modulus {}", sieve.modulus);
@@ -931,7 +1166,7 @@ fn main() {
     // f = k-1
     if k == 1 {
         df_min = d0;
-        dk_min = if d1 >= d0 {d1} else {d0};
+        dk_min = if d1 >= d0 { d1 } else { d0 };
     } else {
         df_min = d1;
         dk_min = d1;
@@ -942,7 +1177,10 @@ fn main() {
         let wheel_start = precise_time_s();
         println!("Instantiating wheels...");
         let (wheels, sieves) = to_wheels(sieves, 1u64, stop - start);
-        println!("Preprocessing done in {:.1} seconds", precise_time_s() - wheel_start);
+        println!(
+            "Preprocessing done in {:.1} seconds",
+            precise_time_s() - wheel_start
+        );
         println!("{} wheels, {} sieves", wheels.len(), sieves.len());
         for wheel in &wheels {
             println!("Wheel modulus: {}", wheel.modulus);
@@ -952,13 +1190,25 @@ fn main() {
         bests = search_with_wheels(&wheels, &sieves, start, stop, dk_star, k, df_min, dk_min);
     } else {
         println!("Searching with {} sieves and a jumplist...", sieves.len());
-        bests = search(&jumplist.unwrap(), &sieves, start, stop, dk_star, k, df_min, dk_min);
+        bests = search(
+            &jumplist.unwrap(),
+            &sieves,
+            start,
+            stop,
+            dk_star,
+            k,
+            df_min,
+            dk_min,
+        );
     }
 
     for hdp in &bests {
         let bits = (hdp.p as f64).log2().ceil();
         let star = if dk_star { "*" } else { "" };
-        let f = k-1;
-        println!("{} ({:.0} bits), d{}{}={}, d{}{}={}", hdp.p, bits, f, star, hdp.df, k, star, hdp.dk);
+        let f = k - 1;
+        println!(
+            "{} ({:.0} bits), d{}{}={}, d{}{}={}",
+            hdp.p, bits, f, star, hdp.df, k, star, hdp.dk
+        );
     }
 }
